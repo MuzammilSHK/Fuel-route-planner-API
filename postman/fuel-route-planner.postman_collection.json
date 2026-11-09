@@ -1,0 +1,289 @@
+{
+  "info": {
+    "name": "Fuel Route Planner",
+    "description": "Example requests for the fuel route planning API. Start the server with `python manage.py runserver`, send a trip, then open the Visualize tab to see the route and fuel stops on a map.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const template = `",
+          "<link rel=\"stylesheet\" href=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.css\">",
+          "<style>",
+          "  body { margin: 0; font-family: system-ui, sans-serif; }",
+          "  #map { height: 560px; }",
+          "</style>",
+          "<div id=\"map\"></div>",
+          "<script src=\"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js\"></script>",
+          "<script>",
+          "  pm.getData(function (error, plan) {",
+          "    const map = L.map(\"map\");",
+          "    const route = L.geoJSON(plan.route, { style: { color: \"#2563eb\", weight: 5 } });",
+          "    map.fitBounds(route.getBounds(), { padding: [30, 30] });",
+          "    L.tileLayer(\"https://tile.openstreetmap.org/{z}/{x}/{y}.png\", {",
+          "      maxZoom: 19,",
+          "      attribution: \"&copy; OpenStreetMap contributors\"",
+          "    }).addTo(map);",
+          "    route.addTo(map);",
+          "    plan.fuel_stops.forEach(function (stop) {",
+          "      L.circleMarker([stop.latitude, stop.longitude], {",
+          "        radius: 9,",
+          "        color: \"#ffffff\",",
+          "        weight: 2,",
+          "        fillColor: \"#f97316\",",
+          "        fillOpacity: 1",
+          "      })",
+          "        .bindTooltip(\"Stop \" + stop.stop + \": \" + stop.name + \", \" + stop.gallons + \" gal at $\" + stop.price_per_gallon)",
+          "        .addTo(map);",
+          "    });",
+          "  });",
+          "</script>`;",
+          "",
+          "pm.test(\"responds with JSON\", function () {",
+          "  pm.response.to.be.json;",
+          "});",
+          "",
+          "if (pm.response.code === 200) {",
+          "  const plan = pm.response.json();",
+          "",
+          "  pm.test(\"returns fuel stops and a total cost\", function () {",
+          "    pm.expect(plan.fuel_stops).to.be.an(\"array\").that.is.not.empty;",
+          "    pm.expect(plan.summary.total_cost).to.be.above(0);",
+          "  });",
+          "",
+          "  pm.visualizer.set(template, plan);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "New York to Los Angeles",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=New York, NY&finish=Los Angeles, CA",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "New York, NY"
+            },
+            {
+              "key": "finish",
+              "value": "Los Angeles, CA"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Chicago to Denver",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=Chicago, IL&finish=Denver, CO",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "Chicago, IL"
+            },
+            {
+              "key": "finish",
+              "value": "Denver, CO"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Houston to Nashville",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=Houston, TX&finish=Nashville, TN",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "Houston, TX"
+            },
+            {
+              "key": "finish",
+              "value": "Nashville, TN"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coordinates as input",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=39.7392,-104.9903&finish=41.8781,-87.6298",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "39.7392,-104.9903"
+            },
+            {
+              "key": "finish",
+              "value": "41.8781,-87.6298"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Street address as input",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=1600 Pennsylvania Ave NW, Washington, DC&finish=Chicago, IL",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "1600 Pennsylvania Ave NW, Washington, DC"
+            },
+            {
+              "key": "finish",
+              "value": "Chicago, IL"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Missing finish",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=Chicago, IL",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "Chicago, IL"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"rejects the request with 400\", function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Outside the USA",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=51.5074,-0.1278&finish=Denver, CO",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "51.5074,-0.1278"
+            },
+            {
+              "key": "finish",
+              "value": "Denver, CO"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"rejects the request with 400\", function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

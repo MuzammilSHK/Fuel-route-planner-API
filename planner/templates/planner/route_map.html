@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel route planner</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1f2937; background: #f3f4f6; }
+    .layout { display: flex; height: 100vh; }
+    #map { flex: 1; }
+    .panel { position: relative; z-index: 1001; width: 360px; overflow-y: auto; background: #fff; padding: 16px;
+             box-shadow: 0 0 18px rgba(0, 0, 0, 0.18); }
+    .panel h1 { font-size: 16px; margin: 0 0 4px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .totals { display: flex; gap: 18px; margin: 14px 0; }
+    .totals strong { display: block; font-size: 20px; }
+    ol { margin: 0; padding-left: 20px; font-size: 13px; }
+    li { margin-bottom: 10px; }
+    .stop-icon { background: #f97316; color: #fff; border: 2px solid #fff; border-radius: 50%; font: 600 12px/20px system-ui, sans-serif;
+                 text-align: center; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+    .error { width: min(420px, 100% - 32px); margin: 40px auto; border-radius: 10px; }
+    @media (max-width: 640px) {
+      .layout { flex-direction: column-reverse; }
+      .layout .panel { width: auto; height: 45%; }
+    }
+  </style>
+</head>
+<body>
+{% if error %}
+  <div class="panel error">
+    <h1>Could not plan this trip</h1>
+    <p>{{ error }}</p>
+  </div>
+{% else %}
+  <main class="layout">
+    <aside class="panel">
+      <h1>{{ plan.start.label }} &rarr; {{ plan.finish.label }}</h1>
+      <div class="muted">{{ plan.summary.distance_miles|floatformat:0 }} miles, about {{ plan.summary.duration_hours|floatformat:1 }} hours of driving</div>
+      <div class="totals">
+        <div><strong>${{ plan.summary.total_cost|floatformat:2 }}</strong><span class="muted">fuel cost</span></div>
+        <div><strong>{{ plan.summary.total_gallons|floatformat:1 }}</strong><span class="muted">gallons</span></div>
+        <div><strong>{{ plan.summary.fuel_stops }}</strong><span class="muted">stops</span></div>
+      </div>
+      {% if plan.summary.starting_fuel_gallons %}
+        <p class="muted">Includes {{ plan.summary.starting_fuel_gallons|floatformat:1 }} gallons (${{ plan.summary.starting_fuel_cost|floatformat:2 }}) already in the tank at the start.</p>
+      {% endif %}
+      <ol>
+        {% for stop in plan.fuel_stops %}
+          <li>
+            <strong>{{ stop.name }}</strong>, {{ stop.city }}, {{ stop.state }}<br>
+            <span class="muted">Mile {{ stop.mile_marker|floatformat:0 }} &middot; ${{ stop.price_per_gallon|floatformat:3 }}/gal &middot; {{ stop.gallons|floatformat:1 }} gal &middot; ${{ stop.cost|floatformat:2 }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+    </aside>
+    <div id="map"></div>
+  </main>
+  {{ plan|json_script:"plan-data" }}
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    const plan = JSON.parse(document.getElementById("plan-data").textContent);
+    const map = L.map("map");
+    const route = L.geoJSON(plan.route, { style: { color: "#2563eb", weight: 5, opacity: 0.8 } });
+    map.fitBounds(route.getBounds(), { padding: [40, 40] });
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+    route.addTo(map);
+
+    function popup(lines) {
+      const box = document.createElement("div");
+      lines.forEach((text, index) => {
+        const row = document.createElement(index === 0 ? "strong" : "div");
+        row.textContent = text;
+        box.appendChild(row);
+      });
+      return box;
+    }
+
+    function endpoint(place, color, title) {
+      L.circleMarker([place.latitude, place.longitude], {
+        radius: 8, color: "#fff", weight: 2, fillColor: color, fillOpacity: 1,
+      }).bindPopup(popup([title, place.label])).addTo(map);
+    }
+
+    endpoint(plan.start, "#16a34a", "Start");
+    endpoint(plan.finish, "#dc2626", "Finish");
+
+    plan.fuel_stops.forEach((stop) => {
+      const icon = L.divIcon({ className: "stop-icon", html: String(stop.stop), iconSize: [24, 24] });
+      L.marker([stop.latitude, stop.longitude], { icon }).bindPopup(popup([
+        `Stop ${stop.stop}: ${stop.name}`,
+        `${stop.city}, ${stop.state}`,
+        `Mile ${Math.round(stop.mile_marker)}, $${stop.price_per_gallon.toFixed(3)} per gallon`,
+        `Buy ${stop.gallons.toFixed(1)} gallons for $${stop.cost.toFixed(2)}`,
+      ])).addTo(map);
+    });
+  </script>
+{% endif %}
+</body>
+</html>
