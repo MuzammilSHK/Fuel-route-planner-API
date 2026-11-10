@@ -7,6 +7,11 @@ class LocationNotFound(APIException):
     default_detail = "That location could not be found in the USA."
 
 
+class SamePlace(APIException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = "Start and finish are the same place."
+
+
 class RouteNotFound(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     default_detail = "No drivable route was found between these locations."

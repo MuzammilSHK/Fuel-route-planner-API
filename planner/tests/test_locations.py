@@ -4,8 +4,7 @@ from django.test import TestCase
 
 from planner.exceptions import LocationNotFound
 from planner.locations import inside_usa, resolve_location
-
-from .helpers import add_place
+from stations.tests.helpers import add_place
 
 WHITE_HOUSE = "1600 Pennsylvania Ave NW, Washington, DC"
 
@@ -32,9 +31,12 @@ class ResolveLocationTests(TestCase):
         )
 
     def test_reads_coordinates_without_any_lookup(self):
-        location = resolve_location("39.7392, -104.9903")
-        self.assertEqual(location.source, "coordinates")
-        self.assertEqual((location.latitude, location.longitude), (39.7392, -104.9903))
+        for text in ("39.7392, -104.9903", "+39.7392,-104.9903"):
+            location = resolve_location(text)
+            self.assertEqual(location.source, "coordinates")
+            self.assertEqual(
+                (location.latitude, location.longitude), (39.7392, -104.9903)
+            )
 
     def test_rejects_coordinates_outside_the_usa(self):
         with self.assertRaisesMessage(LocationNotFound, "not inside the USA"):

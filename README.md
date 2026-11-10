@@ -6,7 +6,7 @@ Send a start and a finish. The API returns the driving route, the fuel stops for
 
 ## Quick start
 
-Python 3.12 or newer is required (Django 6.1). The commands below are for Windows; on macOS or Linux, activate with `source .venv/bin/activate` and copy the file with `cp`.
+Python 3.12 or newer is required (Django 6.1). The commands below are for Windows; on macOS or Linux, activate with `source .venv/bin/activate` and copy the file with `cp`. If `python` is an older version on your machine, create the environment with `py -3.12 -m venv .venv` instead.
 
 ```bash
 python -m venv .venv
@@ -61,7 +61,7 @@ Response, shortened:
     "average_price_per_gallon": 3.002,
     "starting_fuel_gallons": 1.95,
     "starting_fuel_cost": 6.04,
-    "stations_near_route": 377,
+    "stations_near_route": 381,
     "vehicle_range_miles": 500,
     "miles_per_gallon": 10
   },
@@ -82,7 +82,7 @@ Response, shortened:
       "cost": 139.92
     }
   ],
-  "meta": {"external_api_calls": 1, "routing_ms": 1144, "planning_ms": 133},
+  "meta": {"external_api_calls": 1, "routing_ms": 1252, "planning_ms": 23},
   "route": {"type": "LineString", "coordinates": [[-73.93872, 40.6631], [-73.9315, 40.66491]]}
 }
 ```
@@ -98,8 +98,8 @@ Takes the same parameters and returns an HTML page with the route and the fuel s
 
 | Status | When |
 |---|---|
-| 400 | A parameter is missing, start and finish are the same, or a location cannot be found in the USA |
-| 422 | There is no drivable route, or part of the route is more than 500 miles from any fuel station |
+| 400 | A parameter is missing, start and finish are the same place, or a location cannot be found in the USA |
+| 422 | There is no drivable route, or the price list has no station for more than 500 miles of the route |
 | 503 | The routing service is down, the key is missing or rejected, the daily quota is used up, or the stations have not been imported |
 
 Errors come back as `{"detail": "..."}`, or as field errors for invalid parameters.
@@ -110,9 +110,15 @@ Errors come back as `{"detail": "..."}`, or as field errors for invalid paramete
 
 The fuel price file has no coordinates, lists many stations more than once (8,151 rows for 6,738 stations) and includes 620 rows for Canadian stations.
 
-- `import_places` loads the US Census Gazetteer, which lists 32,000 towns with coordinates, into a `Place` table. It cleans the official names (`Boise City city` becomes `Boise City`, also reachable as `Boise`).
-- `import_stations` reads the price file and drops the stations outside the US. It merges duplicate stations, keeping the lowest price, and places each station at its town's coordinates. 6,618 of the 6,626 US stations are placed this way.
-- About 4% of the stations are in small towns the Census file doesn't list. Those towns were looked up once on OpenStreetMap with `lookup_missing_places` and saved to `data/extra_places.csv`. The 8 stations whose towns couldn't be matched reliably are skipped rather than guessed.
+- `import_places` loads the US Census Gazetteer, which lists 32,000 towns with coordinates, into a `Place` table. It cleans the official names (`Boise City city` becomes `Boise City`, also reachable as `Boise`). When a town and a census-designated place in one state share a name, the town keeps it.
+- `import_stations` reads the price file and drops the stations outside the US. It merges duplicate stations, keeping the lowest price, and places each station at its town's coordinates. 6,618 of the 6,626 US stations are placed this way. The 8 whose towns couldn't be matched reliably are skipped rather than guessed.
+
+The Census file needed two repairs. Both were made once with `lookup_extra_places` and saved in `data/extra_places.csv`, which overrides the Census file:
+
+- About 300 stations (4.5%) are in small towns the Census file doesn't list. OpenStreetMap had 219 of those towns.
+- A Census coordinate is the middle of a town's legal boundary, which is not always near a road: San Francisco's is 30 miles out in the Pacific. The command checks every town against the routing service. 239 were more than 5 km from any road a truck can use, and the 61 that OpenStreetMap puts on a road were moved there, San Francisco and Anchorage among them. Most of the rest are Alaskan villages with no road at all.
+
+Three more rows in that file were set by hand. Liberty and Newburg in Pennsylvania and Wilmington in Illinois each share their name with another town in the same state, and the highway exit in the station's address shows which one is meant.
 
 ### Answering a request
 
@@ -129,12 +135,12 @@ The cheapest possible plan is easy to compute with the classic greedy rule:
 - if a cheaper station is within reach, buy just enough to get there;
 - otherwise, fill up.
 
-On real data, though, that rule stopped 20 times between New York and Los Angeles, sometimes to buy a single gallon. So the planner works in two passes:
+On real data, though, that rule stops far too often: 20 times between Seattle and Miami, five of them for less than three gallons. So the planner works in two passes:
 
 1. **Pick the stops** with a shortest-path search (dynamic programming) over the stations, sorted by mile marker. Moving from one station to another within 500 miles costs the fuel for that leg plus a $5 penalty per stop. A stop is only added if it saves more than $5.
 2. **Decide the gallons** at those stops with the greedy rule, so cheap fuel is carried past expensive stations.
 
-On coast-to-coast trips this gives 6 to 9 stops instead of 20, usually within 1 to 2% of the theoretical minimum cost. If any stretch is longer than the tank range, the API says exactly where.
+On the eight long routes I measured, this made 2 to 8 stops where the greedy rule made 4 to 20, and the fuel cost 0.6% to 1.9% more than the theoretical minimum. New York to Los Angeles takes 6 stops instead of 11. If the price list has no station for a stretch longer than the tank range, the API says exactly where.
 
 ### Speed
 
@@ -142,20 +148,21 @@ Measured from a home connection:
 
 | | Time |
 |---|---|
-| New trip, New York to Los Angeles | about 1.7 s, of which about 1.1 s is waiting for OpenRouteService |
-| Same trip again | 30 to 65 ms, with no API call |
+| New trip, New York to Los Angeles | about 1.5 s, of which about 1.2 s is waiting for OpenRouteService |
+| Same trip again | 40 to 70 ms, with no API call |
 | Our own work: stations, optimizer, JSON | 15 to 40 ms |
 
-The station list is loaded into memory once per process, so requests never query the stations table.
+The station list is loaded into memory once per process, so requests never query the stations table. Restart the server after importing stations again.
 
 ## Assumptions
 
 - The vehicle has a 500-mile range (a 50-gallon tank) and does 10 miles per gallon.
 - The truck leaves with just enough fuel to reach its first stop. That fuel is reported as `starting_fuel_gallons` and priced at the first stop, so `total_gallons` always equals the distance divided by 10.
-- The first stop is the best station within the first 25 miles of the route, or the first station on the route if none is that close.
+- The first stop is the best station within 25 miles of the first one on the route.
 - A station counts as on the route if it is within 8 miles of it. Station locations are town-level, because the price file only has a city and state.
 - The $5 stop penalty only affects which stops are chosen. Reported costs are fuel only.
 - Routes avoid border crossings, so a trip never leaves the US.
+- The price list is thin in places. It has no stations in Alaska or Hawaii and only 8 in California, all near the Mexican border. A trip that needs fuel where the list has none, such as Los Angeles to San Francisco, gets a 422 that says where the gap is.
 
 These values live in `config/settings.py`: `VEHICLE_RANGE_MILES`, `VEHICLE_MILES_PER_GALLON`, `MAX_MILES_OFF_ROUTE`, `FIRST_STOP_WITHIN_MILES` and `STOP_PENALTY_DOLLARS`.
 
@@ -165,9 +172,9 @@ These values live in `config/settings.py`: `VEHICLE_RANGE_MILES`, `VEHICLE_MILES
 python manage.py test
 ```
 
-47 tests cover:
+52 tests cover:
 
-- name matching and the import commands;
+- name matching, the import commands and the town lookup;
 - the geometry helpers and the polyline decoder;
 - the station search and the optimizer, including a check that a random plan never runs dry or overfills the tank;
 - the OpenRouteService client and the API endpoints.
@@ -176,7 +183,7 @@ All network calls are faked, so the tests run offline in under a second.
 
 ## Postman
 
-Import `postman/fuel-route-planner.postman_collection.json`. It has example trips, the different input formats and two error cases. Successful plans draw the route and stops in Postman's Visualize tab.
+Import `postman/fuel-route-planner.postman_collection.json`. It has example trips, the different input formats and three error cases. Successful plans draw the route and stops in Postman's Visualize tab.
 
 ## Project layout
 

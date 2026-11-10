@@ -2,8 +2,7 @@ from django.test import TestCase
 
 from planner.corridor import resample_route, station_index, stations_near
 from planner.geo import haversine_miles
-
-from .helpers import add_station
+from stations.tests.helpers import add_station
 
 START = (-100.0, 40.0)
 FINISH = (-99.0, 40.0)

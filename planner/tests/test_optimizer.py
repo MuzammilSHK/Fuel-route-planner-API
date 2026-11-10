@@ -46,6 +46,11 @@ class OptimizerTests(SimpleTestCase):
         self.assertEqual(first_stop, 1)
         self.assertEqual(gallons(purchases), [28.0])
 
+    def test_first_stop_can_be_a_cheaper_station_just_past_a_distant_first_one(self):
+        first_stop, purchases = plan([215, 221, 600], [3.95, 3.54, 3.20], 800)
+        self.assertEqual(first_stop, 1)
+        self.assertEqual([purchase.index for purchase in purchases], [1, 2])
+
     def test_a_short_trip_can_run_on_starting_fuel_alone(self):
         first_stop, purchases = plan([5, 20], [3.00, 2.00], 20)
         self.assertEqual((first_stop, purchases), (1, []))

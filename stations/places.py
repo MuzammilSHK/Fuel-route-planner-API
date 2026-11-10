@@ -103,6 +103,10 @@ def read_census_places(path):
             yield row
 
 
+def incorporated_first(rows):
+    return sorted(rows, key=lambda row: row["NAME"].endswith(" CDP"))
+
+
 def read_extra_places(path):
     if not path.exists():
         return []

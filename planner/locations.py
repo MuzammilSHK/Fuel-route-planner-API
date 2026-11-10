@@ -7,7 +7,7 @@ from stations.places import STATE_NAMES, place_key
 from . import openroute
 from .exceptions import LocationNotFound
 
-COORDINATES = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
+COORDINATES = re.compile(r"^\s*([-+]?\d+(?:\.\d+)?)\s*,\s*([-+]?\d+(?:\.\d+)?)\s*$")
 ZIP_CODE = re.compile(r"\s+\d{5}(?:-\d{4})?$")
 STATE_CODES = {name.lower(): code for code, name in STATE_NAMES.items()}
 COUNTRY_NAMES = {"us", "usa", "united states", "united states of america"}
@@ -24,6 +24,10 @@ class Location:
     latitude: float
     longitude: float
     source: str
+
+    @property
+    def point(self):
+        return self.latitude, self.longitude
 
 
 def resolve_location(text):
@@ -52,7 +56,9 @@ def resolve_location(text):
 
 def from_coordinates(text, latitude, longitude):
     if not inside_usa(latitude, longitude):
-        raise LocationNotFound(f"{text} is not inside the USA.")
+        raise LocationNotFound(
+            f"{text} is not inside the USA. Coordinates are read as latitude,longitude."
+        )
     label = f"{latitude:.5f}, {longitude:.5f}"
     return Location(label, latitude, longitude, "coordinates")
 

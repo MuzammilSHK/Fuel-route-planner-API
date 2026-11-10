@@ -30,21 +30,21 @@ def choose_stops(
     miles, prices, trip_miles, tank_miles, mpg, first_stop_within, stop_penalty
 ):
     if len(miles) == 0:
-        raise FuelGap("No fuel stations were found along this route.")
+        raise FuelGap("The fuel price list has no station along this route.")
     if miles[0] > tank_miles:
         raise FuelGap(gap_message(miles, trip_miles, tank_miles))
 
     cost_per_mile = prices / mpg
     best = np.full(len(miles), np.inf)
     previous = np.full(len(miles), -1)
-    first = miles <= max(first_stop_within, miles[0])
+    first = miles <= miles[0] + first_stop_within
     best[first] = cost_per_mile[first] * miles[first] + stop_penalty
     finish_cost, last_stop = np.inf, -1
 
     for stop in range(len(miles)):
         if np.isinf(best[stop]):
             continue
-        if trip_miles - miles[stop] <= tank_miles:
+        if miles[stop] + tank_miles >= trip_miles:
             total = best[stop] + cost_per_mile[stop] * (trip_miles - miles[stop])
             if total < finish_cost:
                 finish_cost, last_stop = total, stop
@@ -95,6 +95,7 @@ def gap_message(miles, trip_miles, tank_miles):
     points = np.concatenate(([0.0], miles, [trip_miles]))
     widest = int(np.argmax(np.diff(points)))
     return (
-        f"No fuel station between mile {points[widest]:.0f} and mile "
-        f"{points[widest + 1]:.0f}, which is more than the {tank_miles:g}-mile range."
+        f"The fuel price list has no station between mile {points[widest]:.0f} and "
+        f"mile {points[widest + 1]:.0f} of this route, which is more than the "
+        f"{tank_miles:g}-mile range."
     )

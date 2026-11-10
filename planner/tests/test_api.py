@@ -8,8 +8,7 @@ from planner.corridor import station_index
 from planner.geo import haversine_miles
 from planner.openroute import Route
 from stations.models import FuelStation
-
-from .helpers import add_place, add_station
+from stations.tests.helpers import add_place, add_station
 
 ROUTE = [(-100.0, 38.0), (-95.0, 38.0)]
 ROUTE_MILES = float(haversine_miles(38.0, -100.0, 38.0, -95.0))
@@ -62,10 +61,11 @@ class RoutePlanApiTests(TestCase):
         self.assertIn("finish", response.json())
         get_route.assert_not_called()
 
-    def test_same_start_and_finish_is_a_400(self, get_route):
-        response = self.plan(start="Alpha, KS", finish="alpha, ks")
+    def test_the_same_place_written_two_ways_is_a_400(self, get_route):
+        response = self.plan(start="Alpha, KS", finish="alpha, kansas, USA")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("must be different", response.json()["finish"][0])
+        self.assertIn("same place", response.json()["detail"])
+        get_route.assert_not_called()
 
     def test_coordinates_outside_the_usa_are_a_400(self, get_route):
         response = self.plan(start="51.5074,-0.1278", finish="Omega, KS")
@@ -80,7 +80,7 @@ class RoutePlanApiTests(TestCase):
         )
         response = self.plan(**TRIP)
         self.assertEqual(response.status_code, 422)
-        self.assertIn("No fuel station between", response.json()["detail"])
+        self.assertIn("no station between mile", response.json()["detail"])
 
     def test_missing_station_data_is_a_503(self, get_route):
         FuelStation.objects.all().delete()

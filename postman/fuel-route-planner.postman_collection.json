@@ -284,6 +284,48 @@
           }
         }
       ]
+    },
+    {
+      "name": "No fuel stations on the route",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/route/?start=Los Angeles, CA&finish=San Francisco, CA",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "Los Angeles, CA"
+            },
+            {
+              "key": "finish",
+              "value": "San Francisco, CA"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"explains the gap with a 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "  pm.expect(pm.response.json().detail).to.include(\"price list\");",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

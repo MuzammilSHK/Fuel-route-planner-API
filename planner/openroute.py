@@ -44,7 +44,7 @@ def get_route(start, finish):
             "units": "mi",
             "instructions": False,
             "geometry_simplify": True,
-            "radiuses": [5000, 5000],
+            "radiuses": [settings.ORS_SNAP_RADIUS_METERS] * 2,
             "options": {"avoid_borders": "all"},
         },
     )

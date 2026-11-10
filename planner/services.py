@@ -3,6 +3,7 @@ import time
 from django.conf import settings
 
 from .corridor import resample_route, stations_near
+from .exceptions import SamePlace
 from .locations import resolve_location
 from .openroute import get_route
 from .optimizer import plan_fuel_stops
@@ -12,6 +13,8 @@ def plan_trip(start, finish):
     started = time.perf_counter()
     origin = resolve_location(start)
     destination = resolve_location(finish)
+    if origin.point == destination.point:
+        raise SamePlace()
     route, route_cached = get_route(origin, destination)
     routed = time.perf_counter()
 
